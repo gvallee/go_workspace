@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gvallee/go_software_build/pkg/builder"
 	"github.com/gvallee/go_util/pkg/util"
 	"github.com/gvallee/kv/pkg/kv"
 )
@@ -223,6 +224,32 @@ func (w *Config) Load() error {
 	err := w.ParseCfg()
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (w *Config) InstallSoftware(softwareName string, softwareURL string, configArgsFn func() []string) error {
+	b := new(builder.Builder)
+	b.Env.ScratchDir = w.ScratchDir
+	b.Env.InstallDir = w.InstallDir
+	b.Env.BuildDir = filepath.Join(w.BuildDir, softwareName)
+	b.GetConfigureExtraArgs = configArgsFn
+	// fixme: it should fail when not specified but it does not other than when trying to untar
+	b.Env.SrcDir = b.Env.BuildDir
+	// fixme: builder should take care of this
+	if !util.PathExists(filepath.Join(b.Env.BuildDir, softwareName)) {
+		os.MkdirAll(filepath.Join(b.Env.BuildDir, softwareName), 0777)
+	}
+	b.App.Name = softwareName
+	b.App.URL = softwareURL
+	err := b.Load(true)
+	if err != nil {
+		return err
+	}
+	res := b.Install()
+	if res.Err != nil {
+		return res.Err
 	}
 
 	return nil
