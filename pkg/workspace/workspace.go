@@ -62,17 +62,23 @@ type Config struct {
 	MpirunArgs string
 }
 
-func (w *Config) Init() error {
-	if !util.IsDir(w.Basedir) {
-		return fmt.Errorf("the workspace's base directory %s does not exist", w.Basedir)
-	}
-
+func (w *Config) setStructure() {
 	w.ScratchDir = filepath.Join(w.Basedir, "scratch")
 	w.DownloadDir = filepath.Join(w.Basedir, "download")
 	w.SrcDir = filepath.Join(w.Basedir, "src")
 	w.BuildDir = filepath.Join(w.Basedir, "build")
 	w.InstallDir = filepath.Join(w.Basedir, "install")
 	w.RunDir = filepath.Join(w.Basedir, "run")
+}
+
+func (w *Config) Init() error {
+	if !util.IsDir(w.Basedir) {
+		err := os.MkdirAll(w.Basedir, defaultWPMode)
+		if err != nil {
+			return err
+		}
+	}
+	w.setStructure()
 
 	if !util.PathExists(w.DownloadDir) {
 		// We use mkdirall for the first one so that is the basedirectory does not exist, it creates it
@@ -141,9 +147,7 @@ func (w *Config) createDefaultConfigFile() error {
 	}
 
 	configDir := w.getPathToConfigDir()
-	fmt.Printf("DBG - checking whether %s exists", configDir)
 	if !util.PathExists(configDir) {
-		fmt.Printf("DBG - creating directory %s\n", configDir)
 		err := os.MkdirAll(configDir, defaultWPMode)
 		if err != nil {
 			return err
@@ -162,7 +166,6 @@ func (w *Config) createDefaultConfigFile() error {
 		}
 	}
 	content := "dir=" + w.Basedir + "\n"
-	fmt.Printf("DBG - creating %s\n", w.ConfigFile)
 	f, err := os.Create(w.ConfigFile)
 	if err != nil {
 		return err
@@ -212,10 +215,6 @@ func (w *Config) Load() error {
 		if err != nil {
 			return err
 		}
-		err = w.Init()
-		if err != nil {
-			return err
-		}
 		fmt.Printf("warning! new configuration created (%s), please review and customize before re-running the same command", w.ConfigFile)
 		return fmt.Errorf("new configuration file created, it needs review")
 	}
@@ -226,15 +225,50 @@ func (w *Config) Load() error {
 		return err
 	}
 
+	if !util.PathExists(w.Basedir) {
+		err = w.Init()
+		if err != nil {
+			return err
+		}
+	} else {
+		w.setStructure()
+	}
+
 	return nil
 }
 
-func (w *Config) InstallSoftware(softwareName string, softwareURL string, configArgsFn func() []string) error {
+func (w *Config) checkWorkspaceStructure() error {
+	if w.ScratchDir == "" || !util.PathExists(w.ScratchDir) {
+		return fmt.Errorf("workspace's scratch directory is undefined or does not exist")
+	}
+
+	if w.InstallDir == "" || !util.PathExists(w.InstallDir) {
+		return fmt.Errorf("workspace's install directory is undefined or does not exist")
+	}
+
+	if w.BuildDir == "" || !util.PathExists(w.BuildDir) {
+		return fmt.Errorf("workspace's build directory is undefined or does not exist")
+	}
+
+	if w.RunDir == "" || !util.PathExists(w.RunDir) {
+		return fmt.Errorf("workspace's run directory is undefined or does not exist")
+	}
+
+	return nil
+}
+
+func (w *Config) InstallSoftware(softwareName string, softwareURL string, configArgs []string) error {
+	// Sanity checks
+	err := w.checkWorkspaceStructure()
+	if err != nil {
+		return err
+	}
+
 	b := new(builder.Builder)
 	b.Env.ScratchDir = w.ScratchDir
 	b.Env.InstallDir = w.InstallDir
 	b.Env.BuildDir = filepath.Join(w.BuildDir, softwareName)
-	b.GetConfigureExtraArgs = configArgsFn
+	b.ConfigureExtraArgs = configArgs
 	// fixme: it should fail when not specified but it does not other than when trying to untar
 	b.Env.SrcDir = b.Env.BuildDir
 	// fixme: builder should take care of this
@@ -243,7 +277,7 @@ func (w *Config) InstallSoftware(softwareName string, softwareURL string, config
 	}
 	b.App.Name = softwareName
 	b.App.URL = softwareURL
-	err := b.Load(true)
+	err = b.Load(true)
 	if err != nil {
 		return err
 	}
@@ -253,4 +287,8 @@ func (w *Config) InstallSoftware(softwareName string, softwareURL string, config
 	}
 
 	return nil
+}
+
+func (w *Config) GetSoftwareInstallDir(softwareName string) string {
+	return filepath.Join(w.InstallDir, softwareName)
 }
