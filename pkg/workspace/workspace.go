@@ -254,6 +254,10 @@ func (w *Config) checkWorkspaceStructure() error {
 		return fmt.Errorf("workspace's run directory is undefined or does not exist")
 	}
 
+	if w.DownloadDir == "" || !util.PathExists(w.DownloadDir) {
+		return fmt.Errorf("workspace's download directory is undefined or does not exist")
+	}
+
 	return nil
 }
 
@@ -268,13 +272,8 @@ func (w *Config) InstallSoftware(softwareName string, softwareURL string, config
 	b.Env.ScratchDir = w.ScratchDir
 	b.Env.InstallDir = w.InstallDir
 	b.Env.BuildDir = filepath.Join(w.BuildDir, softwareName)
+	b.Env.SrcPath = filepath.Join(w.DownloadDir, softwareName)
 	b.ConfigureExtraArgs = configArgs
-	// fixme: it should fail when not specified but it does not other than when trying to untar
-	b.Env.SrcDir = b.Env.BuildDir
-	// fixme: builder should take care of this
-	if !util.PathExists(filepath.Join(b.Env.BuildDir, softwareName)) {
-		os.MkdirAll(filepath.Join(b.Env.BuildDir, softwareName), 0777)
-	}
 	b.App.Name = softwareName
 	b.App.URL = softwareURL
 	err = b.Load(true)
