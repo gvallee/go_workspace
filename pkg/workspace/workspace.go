@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gvallee/go_software_build/pkg/builder"
+	"github.com/gvallee/go_util/pkg/module"
 	"github.com/gvallee/go_util/pkg/util"
 	"github.com/gvallee/kv/pkg/kv"
 )
@@ -274,6 +276,46 @@ func (w *Config) InstallSoftware(softwareName string, softwareURL string, config
 	b.Env.BuildDir = filepath.Join(w.BuildDir, softwareName)
 	b.Env.SrcPath = filepath.Join(w.DownloadDir, softwareName)
 	b.ConfigureExtraArgs = configArgs
+	b.App.Name = softwareName
+	b.App.URL = softwareURL
+	err = b.Load(true)
+	if err != nil {
+		return err
+	}
+	res := b.Install()
+	if res.Err != nil {
+		return res.Err
+	}
+
+	return nil
+}
+
+func (w *Config) InstallSoftwareUsingModules(softwareName string, softwareURL string, configArgs []string, modules []string) error {
+	// Sanity checks
+	err := w.checkWorkspaceStructure()
+	if err != nil {
+		return err
+	}
+
+	envData, err := module.ToEnv([]string{"PATH", "LD_LIBRARY_PATH", "OPAL_PREFIX"}, modules)
+	newPath := "PATH=" + strings.Join(envData["PATH"], ":") + os.Getenv("PATH")
+	newLdLibraryPath := "LD_LIBRARY_PATH=" + strings.Join(envData["LD_LIBRARY_PATH"], ":") + os.Getenv("LD_LIBRARY_PATH")
+	opalPrefix := ""
+	if val, ok := envData["OPAL_PREFIX"]; ok && len(val) > 0 {
+		opalPrefix = "OPAL_PREFIX=" + strings.Join(envData["OPAL_PREFIX"], ":")
+	}
+
+	b := new(builder.Builder)
+	b.Env.ScratchDir = w.ScratchDir
+	b.Env.InstallDir = w.InstallDir
+	b.Env.BuildDir = filepath.Join(w.BuildDir, softwareName)
+	b.Env.SrcPath = filepath.Join(w.DownloadDir, softwareName)
+	b.ConfigureExtraArgs = configArgs
+	b.Env.Env = append(b.Env.Env, newPath)
+	b.Env.Env = append(b.Env.Env, newLdLibraryPath)
+	if opalPrefix != "" {
+		b.Env.Env = append(b.Env.Env, opalPrefix)
+	}
 	b.App.Name = softwareName
 	b.App.URL = softwareURL
 	err = b.Load(true)

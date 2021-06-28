@@ -4,6 +4,6 @@ go 1.15
 
 require (
 	github.com/gvallee/go_software_build v1.0.0
-	github.com/gvallee/go_util v1.1.0
+	github.com/gvallee/go_util v1.4.0
 	github.com/gvallee/kv v1.0.0
 )
