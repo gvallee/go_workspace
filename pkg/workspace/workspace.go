@@ -8,6 +8,7 @@ package workspace
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -278,6 +279,18 @@ func (w *Config) InstallSoftware(softwareName string, softwareURL string, config
 	b.ConfigureExtraArgs = configArgs
 	b.App.Name = softwareName
 	b.App.URL = softwareURL
+
+	// If users did not specify a special way to configure/install the software and
+	// is MPI is set, we assume by default that MPI has to be used.
+	if configArgs == nil && w.MpiDir != "" {
+		mpiPATH := filepath.Join(w.MpiDir, "bin")
+		mpiLDLIBRARYPATH := filepath.Join(w.MpiDir, "lib")
+		log.Printf("Adding %s to PATH", mpiPATH)
+		log.Printf("Adding %s to LD_LIBRARY_PATH", mpiLDLIBRARYPATH)
+		b.Env.Env = append(b.Env.Env, "PATH="+mpiPATH+":"+os.Getenv("PATH"))
+		b.Env.Env = append(b.Env.Env, "LD_LIBRARY_PATH="+mpiLDLIBRARYPATH+":"+os.Getenv("LD_LIBRARY_PATH"))
+	}
+
 	err = b.Load(true)
 	if err != nil {
 		return err
