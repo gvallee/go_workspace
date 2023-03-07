@@ -278,7 +278,7 @@ func (w *Config) InstallSoftware(softwareName string, softwareURL string, config
 	b.Env.SrcPath = filepath.Join(w.DownloadDir, softwareName)
 	b.ConfigureExtraArgs = configArgs
 	b.App.Name = softwareName
-	b.App.URL = softwareURL
+	b.App.Source.URL = softwareURL
 
 	// If users did not specify a special way to configure/install the software and
 	// is MPI is set, we assume by default that MPI has to be used.
@@ -311,6 +311,9 @@ func (w *Config) InstallSoftwareUsingModules(softwareName string, softwareURL st
 	}
 
 	envData, err := module.ToEnv([]string{"PATH", "LD_LIBRARY_PATH", "OPAL_PREFIX"}, modules)
+	if err != nil {
+		return err
+	}
 	newPath := "PATH=" + strings.Join(envData["PATH"], ":") + os.Getenv("PATH")
 	newLdLibraryPath := "LD_LIBRARY_PATH=" + strings.Join(envData["LD_LIBRARY_PATH"], ":") + os.Getenv("LD_LIBRARY_PATH")
 	opalPrefix := ""
@@ -330,7 +333,7 @@ func (w *Config) InstallSoftwareUsingModules(softwareName string, softwareURL st
 		b.Env.Env = append(b.Env.Env, opalPrefix)
 	}
 	b.App.Name = softwareName
-	b.App.URL = softwareURL
+	b.App.Source.URL = softwareURL
 	err = b.Load(true)
 	if err != nil {
 		return err
